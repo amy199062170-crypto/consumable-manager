@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+
+<html lang="zh-TW">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>耗材收益與分區管理系統</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+
+        body {
+
+            font-family: 'Inter', 'Microsoft JhengHei', sans-serif;
+
+            background: linear-gradient(135deg, #e0f2fe 0%, #f0f9ff 100%);
+
+            min-height: 100vh;
+
+            color: #475569;
+
+        }
+
+        .glass-card {
+
+            background: rgba(255, 255, 255, 0.7);
+
+            backdrop-filter: blur(12px);
+
+            border: 1px solid rgba(255, 255, 255, 0.5);
+
+            border-radius: 1.5rem;
+
+        }
+
+        .btn-active-in { background-color: #bae6fd; color: #0369a1; }
+
+        .btn-active-out { background-color: #ddd6fe; color: #6d28d9; }
+
+        .btn-active-profit { background-color: #fce7f3; color: #be185d; }
+
+        .btn-inactive { background-color: #f8fafc; color: #cbd5e1; border: 1px solid #f1f5f9; }
+
+
+
+        input, select {
+
+            transition: all 0.2s;
+
+            border: 1px solid #e2e8f0;
+
+        }
+
+        input:focus, select:focus {
+
+            border-color: #7dd3fc;
+
+            outline: none;
+
+            box-shadow: 0 0 0 4px rgba(125, 211, 252, 0.1);
+
+        }
+
+        .delete-btn {
+
+            transition: all 0.2s;
+
+            opacity: 0.3;
+
+        }
+
+        tr:hover .delete-btn {
+
+            opacity: 1;
+
+        }
+
+    </style>
+
+</head>
+
+<body class="p-4 md:p-8">
+
+
+
+<div id="app" class="max-w-6xl mx-auto">
+
+    <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+
+        <h1 class="text-2xl font-bold text-sky-500 flex items-center gap-2">
+
+             耗材收益管理 <span class="text-xs font-normal bg-sky-100 text-sky-500 px-3 py-1 rounded-full">
+
+        </h1>
+
+        <div id="connection-status" class="flex items-center gap-3 bg-white/80 px-4 py-2 rounded-full border border-white shadow-sm">
+
+            <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-pulse"></span>
+
+            <span id="status-text" class="text-xs font-bold text-slate-500">雲端連線中...</span>
+
+        </div>
+
+    </header>
+
+
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+
+        <!-- UV 統計 -->
+
+        <div class="bg-gradient-to-br from-sky-400 to-sky-300 p-8 rounded-[2rem] shadow-lg text-white relative overflow-hidden">
+
+            <div class="flex justify-between items-start mb-6">
+
+                <h3 class="text-lg font-bold opacity-90 tracking-wide flex items-center gap-2"> UV 統計</h3>
+
+                <button onclick="resetProfit('uv')" class="text-[10px] bg-white/20 hover:bg-white/40 px-3 py-1.5 rounded-full backdrop-blur-sm font-bold transition-all flex items-center gap-1">
+
+                    🔄 重置收益
+
+                </button>
+
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+
+                <div>
+
+                    <p class="text-[10px] font-bold opacity-70 mb-1 tracking-widest uppercase">耗材支出總額</p>
+
+                    <p class="text-3xl font-black" id="stat-uv-value">$0</p>
+
+                </div>
+
+                <div>
+
+                    <p class="text-[10px] font-bold opacity-70 mb-1 tracking-widest uppercase">累計總收益</p>
+
+                    <p class="text-3xl font-black" id="stat-uv-profit">$0</p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+
+
+        <!-- 割字統計 -->
+
+        <div class="bg-gradient-to-br from-purple-400 to-purple-300 p-8 rounded-[2rem] shadow-lg text-white relative overflow-hidden">
+
+            <div class="flex justify-between items-start mb-6">
+
+                <h3 class="text-lg font-bold opacity-90 tracking-wide flex items-center gap-2">割字統計</h3>
+
+                <button onclick="resetProfit('vinyl')" class="text-[10px] bg-white/20 hover:bg-white/40 px-3 py-1.5 rounded-full backdrop-blur-sm font-bold transition-all flex items-center gap-1">
+
+                    🔄 重置收益
+
+                </button>
+
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+
+                <div>
+
+                    <p class="text-[10px] font-bold opacity-70 mb-1 tracking-widest uppercase">耗材支出總額</p>
+
+                    <p class="text-3xl font-black" id="stat-vinyl-value">$0</p>
+
+                </div>
+
+                <div>
+
+                    <p class="text-[10px] font-bold opacity-70 mb-1 tracking-widest uppercase">累計總收益</p>
+
+                    <p class="text-3xl font-black" id="stat-vinyl-profit">$0</p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+        <!-- 左側：操作區 -->
+
+        <div class="lg:col-span-4 space-y-6">
+
+            <div class="glass-card p-8 shadow-sm">
+
+                <h2 class="text-lg font-bold mb-8 text-slate-700 flex items-center gap-2"> 類別</h2>
+
+
+
+                <div class="space-y-6">
+
+                    <div>
+
+                        <label class="block text-[10px] font-bold text-slate-400 mb-3 tracking-widest uppercase">交易類型</label>
+
+                        <div class="grid grid-cols-3 gap-2">
+
+                            <button onclick="changeType('in')" id="type-in" class="btn-active-in p-3 rounded-2xl text-xs font-bold transition-all">進貨</button>
+
+                            <button onclick="changeType('out')" id="type-out" class="btn-inactive p-3 rounded-2xl text-xs font-bold transition-all">出貨</button>
+
+                            <button onclick="changeType('profit')" id="type-profit" class="btn-inactive p-3 rounded-2xl text-xs font-bold transition-all">賺的</button>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div>
+
+                        <label class="block text-[10px] font-bold text-slate-400 mb-3 tracking-widest uppercase">分類</label>
+
+                        <div class="grid grid-cols-2 gap-3">
+
+                            <button onclick="changeCategory('uv')" id="cat-uv" class="btn-active-in p-4 rounded-2xl font-bold text-sm">UV 庫存</button>
+
+                            <button onclick="changeCategory('vinyl')" id="cat-vinyl" class="btn-inactive p-4 rounded-2xl font-bold text-sm">割字庫存</button>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div id="name-field">
+
+                        <label class="block text-[10px] font-bold text-slate-400 mb-3 tracking-widest uppercase">名稱</label>
+
+                        <div id="name-input-container">
+
+                            <input type="text" id="input-name" placeholder="請輸入耗材名稱" class="w-full p-4 rounded-2xl bg-white/80 font-bold text-slate-600">
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="grid grid-cols-2 gap-4">
+
+                        <div id="qty-box">
+
+                            <label class="block text-[10px] font-bold text-slate-400 mb-3 tracking-widest uppercase">數量</label>
+
+                            <input type="number" id="input-qty" value="1" min="1" class="w-full p-4 rounded-2xl bg-white/80 text-center font-black text-lg text-slate-600">
+
+                        </div>
+
+                        <div id="price-box">
+
+                            <label id="price-label" class="block text-[10px] font-bold text-slate-400 mb-3 tracking-widest uppercase">金額 ($)</label>
+
+                            <input type="number" id="input-price" placeholder="0" class="w-full p-4 rounded-2xl bg-white/80 text-center font-black text-lg text-sky-600">
+
+                        </div>
+
+                    </div>
+
+
+
+                    <button onclick="submitTransaction()" id="submit-btn" disabled class="w-full bg-slate-200 text-slate-400 font-black py-5 rounded-[1.5rem] shadow-lg transition-all transform active:scale-95 cursor-not-allowed text-sm tracking-widest">
+
+                        等待雲端連線...
+
+                    </button>
+
+                </div>
+
+            </div>
+
+            <div class="px-6 text-[10px] text-slate-400 italic text-center" id="last-sync-time">系統載入中...</div>
+
+        </div>
+
+
+
+        <div class="lg:col-span-8 space-y-8">
+
+            <!-- UV 清單 -->
+
+            <div class="glass-card overflow-hidden">
+
+                <div class="p-6 bg-sky-50 border-b border-sky-100 flex justify-between items-center">
+
+                    <h2 class="font-bold text-sky-600 text-sm tracking-wider"> UV 耗材現況</h2>
+
+                </div>
+
+                <div class="overflow-x-auto">
+
+                    <table class="w-full text-left">
+
+                        <thead class="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+
+                            <tr>
+
+                                <th class="px-8 py-4">耗材名稱</th>
+
+                                <th class="px-6 py-4 text-center">剩餘數量</th>
+
+                                <th class="px-6 py-4">投入成本</th>
+
+                                <th class="px-8 py-4 text-right">操作</th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody id="inventory-uv-body" class="text-sm divide-y divide-slate-100"></tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- 割字清單 -->
+
+            <div class="glass-card overflow-hidden">
+
+                <div class="p-6 bg-purple-50 border-b border-purple-100 flex justify-between items-center">
+
+                    <h2 class="font-bold text-purple-600 text-sm tracking-wider"> 割字耗材現況</h2>
+
+                </div>
+
+                <div class="overflow-x-auto">
+
+                    <table class="w-full text-left">
+
+                        <thead class="bg-slate-50 text-slate-400 text-[10px] font-bold uppercase tracking-widest">
+
+                            <tr>
+
+                                <th class="px-8 py-4">耗材名稱</th>
+
+                                <th class="px-6 py-4 text-center">剩餘數量</th>
+
+                                <th class="px-6 py-4">投入成本</th>
+
+                                <th class="px-8 py-4 text-right">操作</th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody id="inventory-vinyl-body" class="text-sm divide-y divide-slate-100"></tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<div id="custom-modal" class="fixed inset-0 bg-slate-900/10 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+
+    <div class="bg-white rounded-[2.5rem] p-10 max-w-sm w-full text-center shadow-2xl">
+
+        <div id="modal-icon" class="text-5xl mb-6">💡</div>
+
+        <h3 id="modal-title" class="text-xl font-bold text-slate-700 mb-2">通知</h3>
+
+        <p id="modal-msg" class="text-slate-400 mb-10 leading-relaxed text-sm"></p>
+
+        <div id="modal-footer" class="flex flex-col gap-3">
+
+            <button onclick="toggleModal(false)" id="modal-close-btn" class="w-full bg-sky-500 text-white font-bold py-5 rounded-2xl shadow-lg">關閉</button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<script type="module">
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+    import { getFirestore, doc, getDoc, setDoc, deleteDoc, addDoc, getDocs, collection, onSnapshot, serverTimestamp, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+
+
+    const appId = 'consumable-master-pro';
+
+
+    // =============================================
+    // 請將下方 firebaseConfig 換成你的 Firebase 設定
+    // =============================================
+    const firebaseConfig = {
+        apiKey: "AIzaSyD5niBgZ0YygHdDoWpUN2IjGkBnG_Tp8RY",
+        authDomain: "consumable-manager-4f7d9.firebaseapp.com",
+        projectId: "consumable-manager-4f7d9",
+        storageBucket: "consumable-manager-4f7d9.firebasestorage.app",
+        messagingSenderId: "792750918268",
+        appId: "1:792750918268:web:b2e1082f19718a8ebc57f9"
+    };
+
+    const app = initializeApp(firebaseConfig);
+
+    const db = getFirestore(app);
+
+    const auth = getAuth(app);
+
+
+
+    let currentType = 'in';
+
+    let currentCategory = 'uv';
+
+    let allInventoryData = [];
+
+
+
+    window.changeType = (type) => {
+
+        currentType = type;
+
+        const btns = { in: 'type-in', out: 'type-out', profit: 'type-profit' };
+
+        const colors = { in: 'btn-active-in', out: 'btn-active-out', profit: 'btn-active-profit' };
+
+
+
+        Object.keys(btns).forEach(k => {
+
+            document.getElementById(btns[k]).className = (k === type) ? `p-3 rounded-2xl text-xs font-bold transition-all ${colors[k]}` : 'btn-inactive p-3 rounded-2xl text-xs font-bold transition-all';
+
+        });
+
+
+
+        const nameField = document.getElementById('name-field');
+
+        const qtyBox = document.getElementById('qty-box');
+
+        const priceBox = document.getElementById('price-box');
+
+        const priceLabel = document.getElementById('price-label');
+
+        const submitBtn = document.getElementById('submit-btn');
+
+
+
+        if (type === 'in') {
+
+            nameField.style.display = 'block';
+
+            qtyBox.style.display = 'block';
+
+            priceBox.style.display = 'block';
+
+            priceLabel.innerText = '進貨單價 ($)';
+
+            submitBtn.innerText = '確認耗材入庫';
+
+            renderNameInput('input');
+
+        } else if (type === 'out') {
+
+            nameField.style.display = 'block';
+
+            qtyBox.style.display = 'block';
+
+            priceBox.style.display = 'none';
+
+            submitBtn.innerText = '消耗耗材量';
+
+            renderNameInput('select');
+
+        } else {
+
+            nameField.style.display = 'none';
+
+            qtyBox.style.display = 'none';
+
+            priceBox.style.display = 'block';
+
+            priceLabel.innerText = '本次營收金額 ($)';
+
+            submitBtn.innerText = '累計成品收益';
+
+        }
+
+    };
+
+
+
+    window.changeCategory = (cat) => {
+
+        currentCategory = cat;
+
+        const btnUv = document.getElementById('cat-uv');
+
+        const btnVinyl = document.getElementById('cat-vinyl');
+
+        btnUv.className = cat === 'uv' ? 'btn-active-in p-4 rounded-2xl font-bold text-sm' : 'btn-inactive p-4 rounded-2xl font-bold text-sm';
+
+        btnVinyl.className = cat === 'vinyl' ? 'btn-active-out p-4 rounded-2xl font-bold text-sm' : 'btn-inactive p-4 rounded-2xl font-bold text-sm';
+
+        if (currentType === 'out') renderNameInput('select');
+
+    };
+
+
+
+    function renderNameInput(mode) {
+
+        const container = document.getElementById('name-input-container');
+
+        if (mode === 'input') {
+
+            container.innerHTML = `<input type="text" id="input-name" placeholder="例如: 藍色膠捲" class="w-full p-4 rounded-2xl bg-white/80 font-bold text-slate-600">`;
+
+        } else {
+
+            const filtered = allInventoryData.filter(item => item.category === currentCategory && item.qty > 0);
+
+            let options = filtered.map(item => `<option value="${item.name}">${item.name} (剩 ${item.qty})</option>`).join('');
+
+            if (!options) options = `<option value="">-- 無庫存 --</option>`;
+
+            container.innerHTML = `<select id="input-name" class="w-full p-4 rounded-2xl bg-white/80 font-bold text-slate-600">${options}</select>`;
+
+        }
+
+    }
+
+
+
+    window.submitTransaction = async () => {
+
+        if (!auth.currentUser) return;
+
+        const nameInput = document.getElementById('input-name');
+
+        const name = (currentType === 'profit') ? '收益' : nameInput?.value?.trim();
+
+        const qty = parseInt(document.getElementById('input-qty')?.value || 0);
+
+        const price = parseFloat(document.getElementById('input-price').value || 0);
+
+
+
+        if (!name && currentType !== 'profit') { showMsg('提示', '請提供耗材名稱', '⚠️'); return; }
+
+
+
+        try {
+
+            if (currentType !== 'profit') {
+
+                const docId = `${currentCategory}_${name.replace(/[\/.\#$\[\]]/g, '-')}`;
+
+                const invRef = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', docId);
+
+                const invSnap = await getDoc(invRef);
+
+                let currentData = invSnap.exists() ? invSnap.data() : { qty: 0, totalInvested: 0, category: currentCategory, name: name };
+
+
+
+                if (currentType === 'in') {
+
+                    await setDoc(invRef, {
+
+                        ...currentData,
+
+                        qty: currentData.qty + qty,
+
+                        totalInvested: (currentData.totalInvested || 0) + (qty * price),
+
+                        lastUpdate: serverTimestamp()
+
+                    });
+
+                } else if (currentType === 'out') {
+
+                    if (currentData.qty < qty) { showMsg('庫存不足', `剩餘 ${currentData.qty}`, '❌'); return; }
+
+                    await setDoc(invRef, {
+
+                        ...currentData,
+
+                        qty: currentData.qty - qty,
+
+                        lastUpdate: serverTimestamp()
+
+                    });
+
+                }
+
+            } else {
+
+                const transCol = collection(db, 'artifacts', appId, 'public', 'data', 'transactions');
+
+                await addDoc(transCol, { category: currentCategory, amount: price, timestamp: serverTimestamp() });
+
+            }
+
+            if (currentType === 'in' && nameInput) nameInput.value = '';
+
+            document.getElementById('input-price').value = '';
+
+            showMsg('成功', '紀錄已同步至雲端', '✅');
+
+        } catch (e) { showMsg('錯誤', '連線失敗，請檢查網路', '📡'); }
+
+    };
+
+
+
+    window.confirmDeleteItem = (cat, name) => {
+
+        const docId = `${cat}_${name.replace(/[\/.\#$\[\]]/g, '-')}`;
+
+        showMsg('確認刪除', `確定要永久刪除「${name}」及其成本紀錄嗎？`, '🗑️', true, async () => {
+
+            try {
+
+                const invRef = doc(db, 'artifacts', appId, 'public', 'data', 'inventory', docId);
+
+                await deleteDoc(invRef);
+
+                toggleModal(false);
+
+            } catch (e) { showMsg('錯誤', '刪除失敗', '❌'); }
+
+        });
+
+    };
+
+
+
+    window.resetProfit = async (cat) => {
+
+        showMsg('重置收益', `確定要歸零「${cat === 'uv' ? 'UV' : '割字'}」的所有收益嗎？`, '🔄', true, async () => {
+
+            try {
+
+                toggleModal(false);
+
+                const transCol = collection(db, 'artifacts', appId, 'public', 'data', 'transactions');
+
+                const snap = await getDocs(transCol);
+
+                const batch = writeBatch(db);
+
+                let count = 0;
+
+                snap.forEach(d => {
+
+                    if (d.data().category === cat) {
+
+                        batch.delete(d.ref);
+
+                        count++;
+
+                    }
+
+                });
+
+                if (count > 0) await batch.commit();
+
+                showMsg('完成', '收益已歸零', '✅');
+
+            } catch (e) { showMsg('錯誤', '重置失敗', '❌'); }
+
+        });
+
+    };
+
+
+
+    function setupListeners() {
+
+        onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'inventory'), (snap) => {
+
+            allInventoryData = [];
+
+            snap.forEach(d => allInventoryData.push(d.data()));
+
+            renderTable('uv', allInventoryData.filter(i => i.category === 'uv'));
+
+            renderTable('vinyl', allInventoryData.filter(i => i.category === 'vinyl'));
+
+
+
+            const uvInvest = allInventoryData.filter(i => i.category === 'uv').reduce((a, b) => a + (b.totalInvested || 0), 0);
+
+            const vinylInvest = allInventoryData.filter(i => i.category === 'vinyl').reduce((a, b) => a + (b.totalInvested || 0), 0);
+
+            document.getElementById('stat-uv-value').innerText = `$${Math.round(uvInvest).toLocaleString()}`;
+
+            document.getElementById('stat-vinyl-value').innerText = `$${Math.round(vinylInvest).toLocaleString()}`;
+
+
+
+            if (currentType === 'out') renderNameInput('select');
+
+            updateLastSync();
+
+        });
+
+
+
+        onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), (snap) => {
+
+            let uv = 0, vinyl = 0;
+
+            snap.forEach(d => {
+
+                const data = d.data();
+
+                if (data.category === 'uv') uv += data.amount || 0;
+
+                else vinyl += data.amount || 0;
+
+            });
+
+            document.getElementById('stat-uv-profit').innerText = `$${Math.round(uv).toLocaleString()}`;
+
+            document.getElementById('stat-vinyl-profit').innerText = `$${Math.round(vinyl).toLocaleString()}`;
+
+            updateLastSync();
+
+        });
+
+    }
+
+
+
+    function updateLastSync() {
+
+        const time = new Date().toLocaleTimeString();
+
+        document.getElementById('last-sync-time').innerText = `最後雲端同步：${time}`;
+
+    }
+
+
+
+    function renderTable(cat, items) {
+
+        const body = document.getElementById(`inventory-${cat}-body`);
+
+        if (!items.length) { body.innerHTML = `<tr><td colspan="4" class="p-10 text-center text-slate-300 italic">暫無資料</td></tr>`; return; }
+
+        body.innerHTML = items.map(i => `
+
+            <tr class="hover:bg-white/50 transition-colors">
+
+                <td class="px-8 py-5 font-bold text-slate-600">${i.name}</td>
+
+                <td class="px-6 py-5 text-center">
+
+                    <span class="${i.qty > 0 ? 'text-sky-500 bg-sky-50' : 'text-rose-400 bg-rose-50'} px-3 py-1 rounded-full font-black text-xs">${i.qty}</span>
+
+                </td>
+
+                <td class="px-6 py-5 font-medium text-slate-400">$${Math.round(i.totalInvested || 0).toLocaleString()}</td>
+
+                <td class="px-8 py-5 text-right">
+
+                    <button onclick="confirmDeleteItem('${i.category}', '${i.name}')" class="delete-btn text-rose-300 hover:text-rose-500 p-2">
+
+                        ✕
+
+                    </button>
+
+                </td>
+
+            </tr>
+
+        `).join('');
+
+    }
+
+
+
+    window.onload = async () => {
+
+        try {
+
+            await signInAnonymously(auth);
+
+            onAuthStateChanged(auth, (u) => {
+
+                if (u) {
+
+                    document.getElementById('status-dot').className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+
+                    document.getElementById('status-text').innerText = '連線正常 (Cloud Online)';
+
+                    const b = document.getElementById('submit-btn');
+
+                    b.disabled = false;
+
+                    b.className = 'w-full bg-sky-400 hover:bg-sky-500 text-white font-black py-5 rounded-[1.5rem] shadow-lg transition-all';
+
+                    changeType('in');
+
+                    setupListeners();
+
+                }
+
+            });
+
+        } catch (e) { document.getElementById('status-text').innerText = '連線失敗'; }
+
+    };
+
+
+
+    window.showMsg = (title, msg, icon, isConfirm = false, onConfirm = null) => {
+
+        document.getElementById('modal-title').innerText = title;
+
+        document.getElementById('modal-msg').innerText = msg;
+
+        document.getElementById('modal-icon').innerText = icon || '💡';
+
+
+
+        const footer = document.getElementById('modal-footer');
+
+        if (isConfirm) {
+
+            footer.innerHTML = `
+
+                <button id="modal-confirm-btn" class="w-full bg-rose-400 text-white font-bold py-4 rounded-2xl shadow-lg">確認執行</button>
+
+                <button onclick="toggleModal(false)" class="w-full bg-slate-100 text-slate-400 font-bold py-4 rounded-2xl">取消</button>
+
+            `;
+
+            document.getElementById('modal-confirm-btn').onclick = onConfirm;
+
+        } else {
+
+            footer.innerHTML = `<button onclick="toggleModal(false)" class="w-full bg-sky-400 text-white font-bold py-4 rounded-2xl shadow-lg">知道了</button>`;
+
+        }
+
+        toggleModal(true);
+
+    };
+
+
+
+    window.toggleModal = (s) => document.getElementById('custom-modal').style.display = s ? 'flex' : 'none';
+
+</script>
+
+</body>
+
+</html>
