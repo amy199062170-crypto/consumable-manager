@@ -123,6 +123,18 @@
         .tab-btn.active { background: white; color: #0369a1; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
         .tab-btn.inactive { background: transparent; color: #94a3b8; }
 
+        /* ── 出貨核對樣式 ── */
+        .ship-tab-active { color: #b19efd; font-weight: 900; border-bottom: 4px solid #b19efd; background-color: rgba(177,158,253,0.08); }
+        .ship-card-selected { border-color: #d1c4fe; background-color: #fcfaff; box-shadow: 0 8px 15px -3px rgba(177,158,253,0.15); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .click-scale { transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .click-scale:active { transform: scale(0.92); }
+        .modal-enter { animation: modalPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        @keyframes modalPop {
+            from { opacity: 0; transform: scale(0.9) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
         /* ── 割字報價樣式 ── */
         .vinyl-glass-card {
             background: rgba(255, 255, 255, 0.9);
@@ -160,6 +172,9 @@
         </button>
         <button onclick="switchTab('vinyl')" id="tab-vinyl" class="tab-btn inactive px-6 py-2.5 rounded-xl font-bold text-sm">
             ✂️ 割字報價
+        </button>
+        <button onclick="switchTab('shipping')" id="tab-shipping" class="tab-btn inactive px-6 py-2.5 rounded-xl font-bold text-sm">
+            📋 出貨核對
         </button>
     </div>
 </div>
@@ -446,6 +461,93 @@
     </div>
 </div>
 
+<!-- ══════════════════════════════════════
+     頁面 4：出貨核對系統
+════════════════════════════════════════ -->
+<div id="page-shipping" class="hidden pb-32">
+
+    <!-- 出貨核對專用確認 Modal -->
+    <div id="ship-confirm-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-6 bg-purple-900/20 backdrop-blur-md">
+        <div class="bg-white rounded-[2.5rem] p-8 max-w-sm w-full shadow-2xl modal-enter">
+            <div class="text-center">
+                <div class="bg-purple-50 text-purple-200 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl">🗑️</div>
+                <h3 class="text-2xl font-black text-slate-700 mb-2">確定要清空嗎？</h3>
+                <p class="text-slate-400 mb-8 leading-relaxed">這將會清除目前所有已選取的出貨款式。</p>
+                <div class="flex flex-col gap-3">
+                    <button onclick="shipExecuteClear()" class="w-full py-4 bg-red-400 text-white rounded-2xl font-black shadow-lg click-scale">確定清除</button>
+                    <button onclick="shipCloseModal()" class="w-full py-4 bg-slate-50 text-slate-400 rounded-2xl font-bold click-scale">返回</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto p-4">
+        <header class="flex items-center justify-between mb-6">
+            <h1 class="text-2xl font-black text-purple-300 flex items-center">
+                <span class="w-2 h-8 bg-purple-200 rounded-full mr-3"></span> 出貨核對
+            </h1>
+            <div class="flex items-center gap-3">
+                <!-- 上傳圖片按鈕 -->
+                <label class="cursor-pointer bg-purple-100 hover:bg-purple-200 text-purple-500 px-4 py-2 rounded-2xl font-bold text-xs flex items-center gap-2 transition-all click-scale">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    上傳圖片
+                    <input type="file" id="ship-upload-input" multiple accept="image/*" class="hidden" onchange="shipHandleUpload(event)">
+                </label>
+                <div class="bg-white px-5 py-2 rounded-2xl shadow-sm border border-purple-50 flex items-center gap-3">
+                    <span class="text-xs text-slate-300 font-bold">總計</span>
+                    <span id="ship-total-count" class="text-2xl font-black text-purple-300">0</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 上傳提示 -->
+        <div id="ship-upload-hint" class="mb-4 bg-purple-50 border border-purple-100 rounded-2xl p-4 text-center hidden">
+            <p class="text-xs text-purple-400 font-bold">請選擇要覆蓋的款式圖片</p>
+            <p class="text-[10px] text-purple-300 mt-1">檔名格式：<span class="font-black">系列名稱-款式字母.jpg</span>（例如：花朵系列-A.jpg）<br>或直接點選格子右上角的 📷 按鈕單張上傳</p>
+            <button onclick="document.getElementById('ship-upload-hint').classList.add('hidden')" class="mt-2 text-[10px] text-purple-300 underline">關閉提示</button>
+        </div>
+
+        <nav class="flex border-b-2 border-purple-50 mb-6 overflow-x-auto no-scrollbar sticky top-0 bg-white/80 backdrop-blur-lg z-30 -mx-4 px-4 py-1" id="ship-tab-container"></nav>
+
+        <main class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3" id="ship-item-grid"></main>
+
+        <div id="ship-checkout-view" class="hidden">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-2xl font-black text-slate-700">📝 核對清單</h2>
+                <button onclick="shipBackToSelection()" class="bg-white border border-sky-100 text-sky-300 px-5 py-2 rounded-xl font-bold text-sm click-scale">← 返回修改</button>
+            </div>
+            <div id="ship-checkout-list" class="space-y-8"></div>
+            <div class="mt-16 mb-20 flex justify-center">
+                <div class="p-2 border-2 border-purple-100 rounded-[2.5rem]">
+                    <button onclick="shipClearAll()" class="bg-slate-100/80 text-red-500 px-10 py-5 rounded-[2rem] font-black flex items-center gap-3 click-scale hover:bg-slate-200 transition-colors">
+                        <span class="text-xl">🗑️</span> 全部核對完成，清除清單
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部摘要 Drawer -->
+    <div id="ship-summary-drawer" class="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-purple-50 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] p-4 md:p-6 transform translate-y-full transition-transform duration-500 z-40 rounded-t-[3rem]">
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-4">
+            <div class="flex-1 flex items-center gap-3 w-full overflow-hidden">
+                <span class="text-purple-300 font-black whitespace-nowrap flex items-center gap-1">
+                    <span class="text-lg">📋</span> 目前選取:
+                </span>
+                <div id="ship-summary-text" class="flex gap-2 overflow-x-auto no-scrollbar py-1"></div>
+            </div>
+            <div class="flex gap-3 w-full md:w-auto">
+                <button onclick="shipClearAll()" class="bg-slate-50 text-slate-300 px-6 py-4 rounded-2xl font-black click-scale hover:text-red-300">清除</button>
+                <button onclick="shipGoToCheckout()" class="flex-1 md:flex-none bg-[#38bdf8] hover:bg-[#0ea5e9] text-white px-8 py-4 rounded-2xl font-black text-lg shadow-lg shadow-sky-100 click-scale flex items-center justify-center gap-2">
+                    <span>✅</span> 前往大圖核對
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ── Modal ── -->
 <div id="custom-modal" class="fixed inset-0 bg-slate-900/10 backdrop-blur-md hidden items-center justify-center z-50 p-4">
     <div class="bg-white rounded-[2.5rem] p-10 max-w-sm w-full text-center shadow-2xl">
@@ -668,13 +770,22 @@
 <script>
     // ── Tab 切換 ──
     window.switchTab = (tab) => {
-        const pages = ['inventory', 'quote', 'vinyl'];
+        const pages = ['inventory', 'quote', 'vinyl', 'shipping'];
         pages.forEach(p => {
             document.getElementById(`page-${p}`).classList.toggle('hidden', p !== tab);
             const btn = document.getElementById(`tab-${p}`);
             btn.classList.toggle('active', p === tab);
             btn.classList.toggle('inactive', p !== tab);
         });
+        // 切換到出貨核對時初始化
+        if (tab === 'shipping' && !window.shipInited) {
+            shipInit();
+            window.shipInited = true;
+        }
+        // 離開出貨核對時隱藏 drawer
+        if (tab !== 'shipping') {
+            document.getElementById('ship-summary-drawer').classList.add('translate-y-full');
+        }
     };
 
     // ── 報價計算 ──
@@ -971,6 +1082,316 @@
     document.getElementById('add-item-btn').addEventListener('click', createItemRow);
     initPriceTable();
     createItemRow();
+</script>
+<script>
+    // ── 出貨核對邏輯 ──
+    const shipCategories = ["花朵系列", "貓咪系列", "狗狗系列", "裝飾線條", "正負能量"];
+
+    const shipDefaultImages = {
+        "花朵系列-A":"https://seller.shopee.tw/api/v1/cdn_proxy/tw-11134207-820ld-mleoakeai8zpe6",
+        "花朵系列-B":"https://down-tw.img.susercontent.com/file/tw-11134207-820l8-mleobvy8n7ybbc.webp",
+        "花朵系列-C":"https://down-tw.img.susercontent.com/tw-11134207-820l7-mleoby3oqvwjc7",
+        "花朵系列-D":"https://down-tw.img.susercontent.com/tw-11134207-820li-mleoc0aiy51ha7",
+        "花朵系列-E":"https://down-tw.img.susercontent.com/file/tw-11134207-820l4-mleoc2v91y4o4a.webp",
+        "花朵系列-F":"https://down-tw.img.susercontent.com/tw-11134207-820l6-mleoc5zelret20",
+        "花朵系列-G":"https://down-tw.img.susercontent.com/tw-11134207-820le-mleoc8ifx3ph62",
+        "花朵系列-H":"https://down-tw.img.susercontent.com/tw-11134207-820l8-mleocb4tsutkcb",
+        "花朵系列-I":"https://down-tw.img.susercontent.com/tw-11134207-820lb-mleocdmrmoeb0d",
+        "花朵系列-J":"https://down-tw.img.susercontent.com/tw-11134207-820lc-mmtt3q7uzjlu28",
+        "花朵系列-K":"https://down-tw.img.susercontent.com/tw-11134207-820le-mnmlxr60ikg4c2",
+        "花朵系列-L":"https://down-tw.img.susercontent.com/tw-11134207-820l7-mnmlyhh9qj2a40",
+        "花朵系列-M":"https://down-tw.img.susercontent.com/tw-11134207-820lb-mnmm07jsun0ma3",
+        "花朵系列-N":"https://down-tw.img.susercontent.com/tw-11134207-820l8-mnmm0a1guhhdbd",
+        "花朵系列-O":"https://down-tw.img.susercontent.com/tw-11134207-820lh-mnnv8czlapdyff",
+        "貓咪系列-A":"https://down-tw.img.susercontent.com/tw-11134207-820lf-mn9idujivfut3a",
+        "貓咪系列-B":"https://down-tw.img.susercontent.com/tw-11134207-820l9-mn9idujiwuf908",
+        "貓咪系列-C":"https://down-tw.img.susercontent.com/tw-11134207-820l8-mn9iduj9730j52",
+        "貓咪系列-D":"https://down-tw.img.susercontent.com/tw-11134207-820lg-mn9idukmplooc0",
+        "貓咪系列-E":"https://down-tw.img.susercontent.com/tw-11134207-820ld-mn9iduj855ohe7",
+        "狗狗系列-A":"https://down-tw.img.susercontent.com/tw-11134207-820lc-mne566kroe0z50",
+        "狗狗系列-B":"https://down-tw.img.susercontent.com/tw-11134207-820l4-mne569ou3tvmcb",
+        "狗狗系列-C":"https://down-tw.img.susercontent.com/tw-11134207-820l7-mne56d405u6df0",
+        "狗狗系列-D":"https://down-tw.img.susercontent.com/tw-11134207-820l4-mne56h0gln2dc7",
+        "狗狗系列-E":"https://down-tw.img.susercontent.com/tw-11134207-820lg-mne56m6yrzt1e1",
+        "狗狗系列-F":"https://down-tw.img.susercontent.com/tw-11134207-820l7-mne573soz7cxa1",
+        "裝飾線條-A":"https://down-tw.img.susercontent.com/tw-11134207-820l7-mlchwrnunimc9d",
+        "裝飾線條-B":"https://down-tw.img.susercontent.com/tw-11134207-820lc-mlchwv4wem8254",
+        "裝飾線條-C":"https://down-tw.img.susercontent.com/tw-11134207-820lc-mlchwxh2yv4493",
+        "裝飾線條-D":"https://down-tw.img.susercontent.com/tw-11134207-820li-mlchx0nn280383",
+        "裝飾線條-E":"https://down-tw.img.susercontent.com/tw-11134207-820l8-mlchx3frwb9ed4",
+        "裝飾線條-F":"https://down-tw.img.susercontent.com/tw-11134207-820l6-mlchx6d6txc86a",
+        "裝飾線條-G":"https://down-tw.img.susercontent.com/tw-11134207-820le-mlchx8v8sn4403",
+        "裝飾線條-H":"https://down-tw.img.susercontent.com/tw-11134207-820la-mlchxbvlxr0v95",
+        "裝飾線條-I":"https://down-tw.img.susercontent.com/tw-11134207-820la-mlchxf34zoqr14",
+        "裝飾線條-J":"https://down-tw.img.susercontent.com/tw-11134207-820lh-mlchxjj60wsv26",
+        "裝飾線條-K":"https://down-tw.img.susercontent.com/tw-11134207-820l6-mlchxps9kjcy1b",
+        "裝飾線條-L":"https://down-tw.img.susercontent.com/tw-11134207-820lb-mlchxs6o1jb5fc",
+        "裝飾線條-M":"https://down-tw.img.susercontent.com/tw-11134207-820lg-mlchxv7as6xb78",
+        "裝飾線條-N":"https://down-tw.img.susercontent.com/tw-11134207-820l4-mlchxy82wowf65",
+        "裝飾線條-O":"https://down-tw.img.susercontent.com/tw-11134207-820lf-mlchy1f9bimnb1",
+        "裝飾線條-P":"https://down-tw.img.susercontent.com/tw-11134207-820lc-mlchybj19w5he1",
+        "裝飾線條-Q":"https://down-tw.img.susercontent.com/tw-11134207-820ld-mlchyfvkpi4v37",
+        "裝飾線條-R":"https://down-tw.img.susercontent.com/tw-11134207-820le-mlchyi6bueiq6c",
+        "裝飾線條-S":"https://down-tw.img.susercontent.com/tw-11134207-820ld-mlchyk3980787d",
+        "裝飾線條-T":"https://down-tw.img.susercontent.com/tw-11134207-820lc-monh4snlskjm8e",
+        "正負能量-A":"https://down-tw.img.susercontent.com/tw-11134207-81ztq-mjhzpr8x4gzq8b",
+        "正負能量-B":"https://down-tw.img.susercontent.com/tw-11134207-81zte-mjhzpub94g7666",
+        "正負能量-C":"https://down-tw.img.susercontent.com/tw-11134207-81zth-mjhzpxd2cs92a6",
+        "正負能量-D":"https://down-tw.img.susercontent.com/tw-11134207-81ztc-mjhzq0j6etqb70",
+        "正負能量-E":"https://down-tw.img.susercontent.com/tw-11134207-81ztm-mjntb0zpcsg6d6",
+        "正負能量-F":"https://down-tw.img.susercontent.com/tw-11134207-81zth-mjntc5yfpy4m04",
+        "正負能量-G":"https://down-tw.img.susercontent.com/tw-11134207-81zti-mjnt9t2ld9tx4d",
+        "正負能量-H":"https://down-tw.img.susercontent.com/tw-11134207-81ztf-mjnt9w1k0qv535",
+        "正負能量-I":"https://down-tw.img.susercontent.com/tw-11134207-81ztn-mjntpy4clsld96",
+        "正負能量-J":"https://down-tw.img.susercontent.com/tw-11134207-81ztl-mjntq2yqwnb9b0",
+        "正負能量-K":"https://down-tw.img.susercontent.com/tw-11134207-81ztq-mjntqcrkxjb4b5",
+        "正負能量-L":"https://down-tw.img.susercontent.com/tw-11134207-81ztq-mjntqguponwn81",
+        "正負能量-M":"https://down-tw.img.susercontent.com/tw-11134207-81ztj-mjnuoqbnyyvbe0",
+        "正負能量-N":"https://down-tw.img.susercontent.com/tw-11134207-81ztm-mjnuou8c6arp1e",
+        "正負能量-O":"https://down-tw.img.susercontent.com/tw-11134207-81ztf-mjnuoy9vym8370",
+        "正負能量-P":"https://down-tw.img.susercontent.com/tw-11134207-81zte-mjnup2tbv4ldb3",
+        "正負能量-Q":"https://down-tw.img.susercontent.com/tw-11134207-81ztj-mjnup9qgbxtw24",
+        "正負能量-R":"https://down-tw.img.susercontent.com/tw-11134207-81zti-mjnupdxzqfiad1",
+        "正負能量-S":"https://down-tw.img.susercontent.com/tw-11134207-81ztn-mjnupiav82yo51",
+        "正負能量-T":"https://down-tw.img.susercontent.com/tw-11134207-81ztp-mjnuplvxb18hc6",
+        "正負能量-U":"https://down-tw.img.susercontent.com/tw-11134207-81zth-mjnupsocs8w4a0",
+        "正負能量-V":"https://down-tw.img.susercontent.com/tw-11134207-81ztq-mjnupw0ddhqb25",
+    };
+
+    // 從 localStorage 讀取自訂圖片
+    let shipCustomImages = JSON.parse(localStorage.getItem('shipCustomImages') || '{}');
+    let shipCurrentCategory = shipCategories[0];
+    let shipSelectedItems = {};
+
+    function shipGetImage(id) {
+        return shipCustomImages[id] || shipDefaultImages[id] || '';
+    }
+
+    function shipInit() {
+        shipRenderTabs();
+        shipRenderGrid();
+        shipUpdateUI();
+    }
+
+    function shipRenderTabs() {
+        const container = document.getElementById('ship-tab-container');
+        container.innerHTML = shipCategories.map(cat => {
+            const catCount = Object.entries(shipSelectedItems)
+                .filter(([key, val]) => key.startsWith(cat) && val > 0)
+                .reduce((sum, [_, val]) => sum + val, 0);
+            return `
+                <button onclick="shipSwitchCategory('${cat}')"
+                        class="px-6 py-4 flex items-center gap-2 whitespace-nowrap transition-all border-b-4 border-transparent ${shipCurrentCategory === cat ? 'ship-tab-active' : 'text-slate-300'}">
+                    ${cat}
+                    ${catCount > 0 ? `<span class="bg-purple-200 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black">${catCount}</span>` : ''}
+                </button>
+            `;
+        }).join('');
+    }
+
+    window.shipSwitchCategory = function(cat) {
+        shipCurrentCategory = cat;
+        shipRenderTabs();
+        shipRenderGrid();
+    };
+
+    function shipRenderGrid() {
+        const grid = document.getElementById('ship-item-grid');
+        const availableItems = Object.keys(shipDefaultImages)
+            .filter(key => key.startsWith(`${shipCurrentCategory}-`))
+            .sort();
+
+        if (!availableItems.length) {
+            grid.innerHTML = `<div class="col-span-full py-20 text-center text-slate-300 font-bold">此類別暫無商品資料</div>`;
+            return;
+        }
+
+        grid.innerHTML = availableItems.map(itemId => {
+            const style = itemId.split('-')[1];
+            const count = shipSelectedItems[itemId] || 0;
+            const isSelected = count > 0;
+            const imgSrc = shipGetImage(itemId);
+            return `
+                <div class="group bg-white p-3 rounded-[2rem] border-2 ${isSelected ? 'ship-card-selected' : 'border-slate-50'} shadow-sm transition-all">
+                    <div class="relative aspect-square bg-slate-50/50 rounded-[1.5rem] mb-3 overflow-hidden click-scale" onclick="shipAddItem('${itemId}')">
+                        <img src="${imgSrc}" class="w-full h-full object-cover" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f1f5f9%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2255%22 text-anchor=%22middle%22 fill=%22%23cbd5e1%22 font-size=%2214%22>${style}</text></svg>'">
+                        <!-- 單張上傳按鈕 -->
+                        <label class="absolute top-1 right-1 bg-white/80 hover:bg-white text-purple-400 w-7 h-7 rounded-full flex items-center justify-center cursor-pointer shadow-sm opacity-0 group-hover:opacity-100 transition-opacity" onclick="event.stopPropagation()">
+                            📷
+                            <input type="file" accept="image/*" class="hidden" onchange="shipUploadSingle('${itemId}', this)">
+                        </label>
+                    </div>
+                    <div class="text-center mb-2">
+                        <span class="block text-sm font-black text-slate-500 uppercase tracking-tighter">${style} 款式</span>
+                    </div>
+                    <div class="flex items-center justify-between bg-slate-50 rounded-xl p-1">
+                        <button onclick="shipRemoveItem('${itemId}')" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white text-slate-300 hover:text-red-400 shadow-sm click-scale">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M20 12H4"/></svg>
+                        </button>
+                        <span class="font-black text-slate-600 w-6 text-center">${count}</span>
+                        <button onclick="shipAddItem('${itemId}')" class="w-8 h-8 flex items-center justify-center rounded-lg bg-sky-200 text-white shadow-sm click-scale">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"/></svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    window.shipAddItem = function(itemId) {
+        shipSelectedItems[itemId] = (shipSelectedItems[itemId] || 0) + 1;
+        shipUpdateUI();
+    };
+
+    window.shipRemoveItem = function(itemId) {
+        if (shipSelectedItems[itemId] > 0) {
+            shipSelectedItems[itemId]--;
+            if (shipSelectedItems[itemId] === 0) delete shipSelectedItems[itemId];
+            shipUpdateUI();
+        }
+    };
+
+    function shipUpdateUI() {
+        if (document.getElementById('ship-checkout-view').classList.contains('hidden')) {
+            shipRenderGrid();
+            shipRenderTabs();
+        }
+        const total = Object.values(shipSelectedItems).reduce((a, b) => a + b, 0);
+        document.getElementById('ship-total-count').innerText = total;
+
+        const drawer = document.getElementById('ship-summary-drawer');
+        const summaryText = document.getElementById('ship-summary-text');
+
+        if (total > 0 && document.getElementById('ship-checkout-view').classList.contains('hidden')) {
+            drawer.classList.remove('translate-y-full');
+            summaryText.innerHTML = Object.entries(shipSelectedItems)
+                .filter(([, c]) => c > 0)
+                .map(([id, c]) => `
+                    <div class="bg-white border border-purple-100 px-4 py-2 rounded-full whitespace-nowrap flex items-center gap-2 shadow-sm">
+                        <span class="text-slate-500 font-bold text-xs">${id}</span>
+                        <span class="text-purple-400 font-black text-xs">x${c}</span>
+                    </div>`)
+                .join('');
+        } else {
+            drawer.classList.add('translate-y-full');
+        }
+    }
+
+    window.shipGoToCheckout = function() {
+        document.getElementById('ship-item-grid').classList.add('hidden');
+        document.getElementById('ship-tab-container').classList.add('hidden');
+        document.getElementById('ship-summary-drawer').classList.add('translate-y-full');
+        document.getElementById('ship-checkout-view').classList.remove('hidden');
+        shipRenderCheckoutList();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    window.shipBackToSelection = function() {
+        document.getElementById('ship-checkout-view').classList.add('hidden');
+        document.getElementById('ship-item-grid').classList.remove('hidden');
+        document.getElementById('ship-tab-container').classList.remove('hidden');
+        shipUpdateUI();
+    };
+
+    function shipRenderCheckoutList() {
+        const listContainer = document.getElementById('ship-checkout-list');
+        const groupedItems = {};
+        Object.entries(shipSelectedItems).forEach(([itemId, count]) => {
+            if (count > 0) {
+                const cat = itemId.substring(0, itemId.lastIndexOf('-'));
+                const style = itemId.split('-')[1];
+                if (!groupedItems[cat]) groupedItems[cat] = [];
+                groupedItems[cat].push({ id: itemId, style, count });
+            }
+        });
+
+        let html = '';
+        for (const [cat, items] of Object.entries(groupedItems)) {
+            html += `
+                <div class="mb-10">
+                    <div class="flex items-center gap-3 mb-6 bg-sky-50 p-4 rounded-2xl border border-sky-100 mx-2">
+                        <span class="w-2 h-6 bg-sky-300 rounded-full"></span>
+                        <h3 class="font-black text-xl text-sky-300 tracking-tight">${cat}</h3>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 px-2">
+            `;
+            items.sort((a, b) => a.style.localeCompare(b.style)).forEach(item => {
+                html += `
+                    <div class="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-purple-50 flex flex-col">
+                        <div class="w-full aspect-square bg-slate-50">
+                            <img src="${shipGetImage(item.id)}" class="w-full h-full object-cover">
+                        </div>
+                        <div class="p-4 text-center">
+                            <h4 class="text-xl font-black text-slate-700 mb-1">款式 ${item.style}</h4>
+                            <p class="text-[10px] text-slate-300 font-bold mb-3">${item.id}</p>
+                            <div class="bg-sky-50/50 rounded-2xl py-4 flex flex-col items-center">
+                                <span class="text-[8px] font-black text-sky-200 uppercase tracking-widest mb-1">核對數量</span>
+                                <span class="text-3xl font-black text-sky-400">x ${item.count}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div></div>`;
+        }
+        listContainer.innerHTML = html || '<div class="text-center py-20 text-slate-300 font-black">清單目前是空的 🍃</div>';
+    }
+
+    window.shipClearAll = function() {
+        document.getElementById('ship-confirm-modal').classList.remove('hidden');
+    };
+
+    window.shipCloseModal = function() {
+        document.getElementById('ship-confirm-modal').classList.add('hidden');
+    };
+
+    window.shipExecuteClear = function() {
+        shipSelectedItems = {};
+        shipCloseModal();
+        if (!document.getElementById('ship-checkout-view').classList.contains('hidden')) {
+            shipBackToSelection();
+        } else {
+            shipUpdateUI();
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    // 批量上傳（根據檔名對應款式）
+    window.shipHandleUpload = function(event) {
+        const files = event.target.files;
+        let count = 0;
+        Array.from(files).forEach(file => {
+            const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+            if (shipDefaultImages[nameWithoutExt] !== undefined || true) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    shipCustomImages[nameWithoutExt] = e.target.result;
+                    localStorage.setItem('shipCustomImages', JSON.stringify(shipCustomImages));
+                    count++;
+                    if (count === files.length) {
+                        shipRenderGrid();
+                        document.getElementById('ship-upload-hint').classList.remove('hidden');
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        event.target.value = '';
+    };
+
+    // 單張上傳
+    window.shipUploadSingle = function(itemId, input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            shipCustomImages[itemId] = e.target.result;
+            localStorage.setItem('shipCustomImages', JSON.stringify(shipCustomImages));
+            shipRenderGrid();
+        };
+        reader.readAsDataURL(file);
+        input.value = '';
+    };
 </script>
 </body>
 </html>
