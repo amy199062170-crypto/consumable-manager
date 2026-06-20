@@ -1567,5 +1567,11 @@
         input.value = '';
     };
 </script>
+<script>
+    // 每 10 分鐘 ping 自己，防止 Render 睡眠
+    setInterval(() => {
+        fetch(window.location.href, { method: 'HEAD', cache: 'no-store' }).catch(() => {});
+    }, 10 * 60 * 1000);
+</script>
 </body>
 </html>
