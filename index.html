@@ -1242,6 +1242,7 @@
 
         grid.innerHTML = availableItems.map(itemId => {
             const style = itemId.split('-')[1];
+            const label = shipCustomLabels[itemId] || (style + ' 款式');
             const count = shipSelectedItems[itemId] || 0;
             const isSelected = count > 0;
             const imgSrc = shipGetImage(itemId);
@@ -1257,8 +1258,13 @@
                         <!-- 刪除按鈕 -->
                         <button onclick="event.stopPropagation(); shipDeleteItem('${itemId}')" class="absolute top-1 left-1 bg-white/80 hover:bg-red-100 text-red-400 w-7 h-7 rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity text-xs font-black">✕</button>
                     </div>
-                    <div class="text-center mb-2">
-                        <span class="block text-sm font-black text-slate-500 uppercase tracking-tighter">${style} 款式</span>
+                    <div class="text-center mb-2 flex items-center justify-center gap-1">
+                        <span id="label-${itemId}" class="text-sm font-black text-slate-500 tracking-tighter">${label}</span>
+                        <button onclick="shipStartRenameItem('${itemId}')" class="text-slate-300 hover:text-blue-400 text-xs transition-colors">✏️</button>
+                    </div>
+                    <div id="rename-box-${itemId}" class="hidden mb-2 flex gap-1">
+                        <input id="rename-input-${itemId}" type="text" value="${label}" class="flex-1 px-2 py-1 rounded-lg border border-blue-200 text-xs text-slate-600 outline-none" style="font-size:14px">
+                        <button onclick="shipConfirmRenameItem('${itemId}')" class="bg-blue-400 text-white px-2 py-1 rounded-lg text-xs font-bold">✓</button>
                     </div>
                     <div class="flex items-center justify-between bg-slate-50 rounded-xl p-1">
                         <button onclick="shipRemoveItem('${itemId}')" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white text-slate-300 hover:text-red-400 shadow-sm click-scale">
@@ -1470,6 +1476,28 @@
         shipSaveToStorage();
         shipRenderGrid();
         shipUpdateUI();
+    };
+
+    // 款式改名
+    let shipCustomLabels = JSON.parse(localStorage.getItem('shipCustomLabels') || '{}');
+
+    window.shipStartRenameItem = function(itemId) {
+        const box = document.getElementById(`rename-box-${itemId}`);
+        const input = document.getElementById(`rename-input-${itemId}`);
+        box.classList.toggle('hidden');
+        input.focus();
+        input.select();
+    };
+
+    window.shipConfirmRenameItem = function(itemId) {
+        const input = document.getElementById(`rename-input-${itemId}`);
+        const newLabel = input.value.trim();
+        if (!newLabel) return;
+        shipCustomLabels[itemId] = newLabel;
+        localStorage.setItem('shipCustomLabels', JSON.stringify(shipCustomLabels));
+        const label = document.getElementById(`label-${itemId}`);
+        if (label) label.innerText = newLabel;
+        document.getElementById(`rename-box-${itemId}`).classList.add('hidden');
     };
 
     // 展開改名輸入框
