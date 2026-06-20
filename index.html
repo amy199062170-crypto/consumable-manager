@@ -122,6 +122,29 @@
         .tab-btn { transition: all 0.2s; }
         .tab-btn.active { background: white; color: #0369a1; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
         .tab-btn.inactive { background: transparent; color: #94a3b8; }
+
+        /* ── 割字報價樣式 ── */
+        .vinyl-glass-card {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 25px -5px rgba(150, 150, 200, 0.2);
+        }
+        .btn-gradient {
+            background: linear-gradient(to right, #a18cd1 0%, #fbc2eb 100%);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-gradient:active { transform: scale(0.95); }
+        .item-row { transition: all 0.3s ease; }
+        .switch-label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+            color: #a18cd1;
+        }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -134,6 +157,9 @@
         </button>
         <button onclick="switchTab('quote')" id="tab-quote" class="tab-btn inactive px-6 py-2.5 rounded-xl font-bold text-sm">
             🖨️ UV 報價
+        </button>
+        <button onclick="switchTab('vinyl')" id="tab-vinyl" class="tab-btn inactive px-6 py-2.5 rounded-xl font-bold text-sm">
+            ✂️ 割字報價
         </button>
     </div>
 </div>
@@ -377,6 +403,49 @@
     </div>
 </div>
 
+<!-- ══════════════════════════════════════
+     頁面 3：割字報價系統
+════════════════════════════════════════ -->
+<div id="page-vinyl" class="hidden">
+    <div class="max-w-md mx-auto md:max-w-2xl">
+        <div class="text-center mb-8 pt-6">
+            <h1 class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-500 to-blue-400 drop-shadow-sm">
+                割字報價系統
+            </h1>
+        </div>
+
+        <div class="vinyl-glass-card p-5 mb-6">
+            <div id="items-container" class="space-y-6"></div>
+            <button id="add-item-btn" class="w-full mt-6 py-3 btn-gradient text-white font-bold rounded-2xl shadow-lg flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4" />
+                </svg>
+                新增一筆項目
+            </button>
+        </div>
+
+        <div class="vinyl-glass-card p-6 mb-6 text-center border-t-4 border-purple-300">
+            <p class="text-gray-500 text-sm font-medium mb-1">訂單總金額</p>
+            <div class="flex items-center justify-center gap-1">
+                <span class="text-purple-500 text-xl font-bold">NT$</span>
+                <span id="total-price" class="text-4xl font-black text-purple-600">0</span>
+            </div>
+        </div>
+
+        <div class="vinyl-glass-card p-5">
+            <h2 class="text-sm font-bold text-purple-500 mb-3 flex items-center gap-2">
+                <span class="w-1 h-4 bg-purple-400 rounded-full"></span> 價格參考表 (單字價)
+            </h2>
+            <div class="grid grid-cols-3 gap-2 text-xs text-center">
+                <div class="bg-purple-50 p-2 rounded-lg font-bold text-purple-700">尺寸</div>
+                <div class="bg-blue-50 p-2 rounded-lg font-bold text-blue-700">中文</div>
+                <div class="bg-pink-50 p-2 rounded-lg font-bold text-pink-700">英/標</div>
+                <div id="price-grid-content" class="contents"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- ── Modal ── -->
 <div id="custom-modal" class="fixed inset-0 bg-slate-900/10 backdrop-blur-md hidden items-center justify-center z-50 p-4">
     <div class="bg-white rounded-[2.5rem] p-10 max-w-sm w-full text-center shadow-2xl">
@@ -599,7 +668,7 @@
 <script>
     // ── Tab 切換 ──
     window.switchTab = (tab) => {
-        const pages = ['inventory', 'quote'];
+        const pages = ['inventory', 'quote', 'vinyl'];
         pages.forEach(p => {
             document.getElementById(`page-${p}`).classList.toggle('hidden', p !== tab);
             const btn = document.getElementById(`tab-${p}`);
@@ -744,5 +813,164 @@
     document.getElementById('quantity').addEventListener('input', calculate);
 </script>
 
+<script>
+    // ── 割字報價邏輯 ──
+    const priceRules = [
+        { min: 3, max: 5, chinese: 11, english: 7 },
+        { min: 6, max: 10, chinese: 16, english: 13 },
+        { min: 11, max: 15, chinese: 21, english: 17 },
+        { min: 16, max: 20, chinese: 26, english: 22 },
+        { min: 21, max: 25, chinese: 29, english: 26 },
+        { min: 26, max: 28, chinese: 33, english: 30 }
+    ];
+
+    let itemCount = 0;
+
+    function initPriceTable() {
+        const grid = document.getElementById('price-grid-content');
+        priceRules.forEach(rule => {
+            grid.innerHTML += `
+                <div class="p-2 border-b border-gray-50 text-gray-600">${rule.min}-${rule.max}cm</div>
+                <div class="p-2 border-b border-gray-50 text-blue-500 font-medium">$${rule.chinese}</div>
+                <div class="p-2 border-b border-gray-50 text-pink-500 font-medium">$${rule.english}</div>
+            `;
+        });
+    }
+
+    window.toggleInputMode = function(id) {
+        const row = document.getElementById(id);
+        const isManual = row.querySelector('.mode-toggle').checked;
+        row.querySelector('.text-input-area').classList.toggle('hidden', isManual);
+        row.querySelector('.manual-input-area').classList.toggle('hidden', !isManual);
+        calculateVinylTotal();
+    };
+
+    function createItemRow() {
+        itemCount++;
+        const id = `item-${itemCount}`;
+        const div = document.createElement('div');
+        div.id = id;
+        div.className = "item-row p-4 rounded-2xl bg-gradient-to-br from-white to-purple-50 border border-purple-100 relative shadow-sm";
+
+        div.innerHTML = `
+            <div class="flex flex-col gap-4">
+                <div class="flex justify-between items-center">
+                    <label class="switch-label gap-2">
+                        <input type="checkbox" class="mode-toggle hidden" onchange="toggleInputMode('${id}')">
+                        <div class="w-8 h-4 bg-gray-200 rounded-full relative transition-colors duration-200">
+                            <div class="dot absolute left-0.5 top-0.5 bg-white w-3 h-3 rounded-full transition-transform duration-200"></div>
+                        </div>
+                        <span>切換手動輸入字數</span>
+                    </label>
+                    <button onclick="removeItem('${id}')" class="text-pink-300 hover:text-pink-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="text-input-area">
+                    <label class="text-xs font-bold text-purple-400 mb-1 block">文字內容</label>
+                    <input type="text" placeholder="輸入文字內容..." oninput="calculateVinylTotal()" class="content-input w-full px-4 py-3 bg-white border-2 border-purple-100 rounded-xl focus:border-purple-300 outline-none text-gray-700 shadow-inner" style="font-size:16px">
+                    <div class="mt-2 flex gap-2">
+                        <span class="count-chinese bg-blue-100 text-blue-600 px-2 py-1 rounded-lg text-[10px] font-bold">中: 0</span>
+                        <span class="count-english bg-pink-100 text-pink-600 px-2 py-1 rounded-lg text-[10px] font-bold">英/標: 0</span>
+                    </div>
+                </div>
+                <div class="manual-input-area hidden grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-bold text-blue-400 mb-1 block">中文字數</label>
+                        <input type="number" min="0" value="0" oninput="calculateVinylTotal()" class="manual-c-input w-full px-4 py-3 bg-white border-2 border-blue-50 rounded-xl outline-none text-gray-700 shadow-inner text-sm" style="font-size:16px">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-pink-400 mb-1 block">英/標字數</label>
+                        <input type="number" min="0" value="0" oninput="calculateVinylTotal()" class="manual-e-input w-full px-4 py-3 bg-white border-2 border-pink-50 rounded-xl outline-none text-gray-700 shadow-inner text-sm" style="font-size:16px">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-purple-400 mb-1">尺寸</label>
+                        <select onchange="calculateVinylTotal()" class="size-select w-full px-3 py-2 bg-white border-2 border-purple-100 rounded-xl text-sm text-gray-600 outline-none" style="font-size:16px">
+                            ${priceRules.map(r => `<option value="${r.min}">${r.min}-${r.max} CM</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-purple-400 mb-1">張數</label>
+                        <input type="number" value="1" min="1" oninput="calculateVinylTotal()" class="qty-input w-full px-3 py-2 bg-white border-2 border-purple-100 rounded-xl text-sm text-gray-600 text-center outline-none" style="font-size:16px">
+                    </div>
+                </div>
+                <div class="pt-2 border-t border-dashed border-purple-200 flex justify-between items-center">
+                    <span class="text-xs font-bold text-purple-400 tracking-wider uppercase">金額</span>
+                    <span class="item-subtotal text-xl font-bold text-purple-500">$ 0</span>
+                </div>
+            </div>
+        `;
+
+        const toggle = div.querySelector('.mode-toggle');
+        toggle.addEventListener('change', function() {
+            const dot = this.nextElementSibling.querySelector('.dot');
+            const bg = this.nextElementSibling;
+            if (this.checked) {
+                dot.style.transform = 'translateX(1rem)';
+                bg.classList.replace('bg-gray-200', 'bg-purple-400');
+            } else {
+                dot.style.transform = 'translateX(0)';
+                bg.classList.replace('bg-purple-400', 'bg-gray-200');
+            }
+        });
+
+        document.getElementById('items-container').appendChild(div);
+        calculateVinylTotal();
+    }
+
+    window.removeItem = function(id) {
+        const rows = document.querySelectorAll('.item-row');
+        if (rows.length > 1) {
+            const el = document.getElementById(id);
+            el.style.opacity = '0';
+            el.style.transform = 'scale(0.9)';
+            setTimeout(() => { el.remove(); calculateVinylTotal(); }, 200);
+        } else {
+            const el = document.getElementById(id);
+            el.querySelector('.content-input').value = '';
+            el.querySelector('.manual-c-input').value = '0';
+            el.querySelector('.manual-e-input').value = '0';
+            el.querySelector('.qty-input').value = '1';
+            calculateVinylTotal();
+        }
+    };
+
+    function calculateVinylTotal() {
+        let grandTotal = 0;
+        document.querySelectorAll('.item-row').forEach(row => {
+            const isManual = row.querySelector('.mode-toggle').checked;
+            const sizeMin = parseInt(row.querySelector('.size-select').value);
+            const qty = parseInt(row.querySelector('.qty-input').value) || 0;
+            const rule = priceRules.find(r => r.min === sizeMin);
+            let cCount = 0, eCount = 0;
+
+            if (isManual) {
+                cCount = parseInt(row.querySelector('.manual-c-input').value) || 0;
+                eCount = parseInt(row.querySelector('.manual-e-input').value) || 0;
+            } else {
+                const text = row.querySelector('.content-input').value;
+                for (let char of text) {
+                    if (/[一-鿿]/.test(char)) cCount++;
+                    else if (char.trim() !== '') eCount++;
+                }
+                row.querySelector('.count-chinese').innerText = `中: ${cCount}`;
+                row.querySelector('.count-english').innerText = `英/標: ${eCount}`;
+            }
+
+            const finalSubtotal = ((cCount * rule.chinese) + (eCount * rule.english)) * qty;
+            row.querySelector('.item-subtotal').innerText = `$ ${finalSubtotal.toLocaleString()}`;
+            grandTotal += finalSubtotal;
+        });
+        document.getElementById('total-price').innerText = grandTotal.toLocaleString();
+    }
+
+    document.getElementById('add-item-btn').addEventListener('click', createItemRow);
+    initPriceTable();
+    createItemRow();
+</script>
 </body>
 </html>
