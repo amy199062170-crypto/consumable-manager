@@ -1217,7 +1217,17 @@
             grid.parentNode.insertBefore(delBtn, grid);
         }
         if (shipExtraCategories.includes(shipCurrentCategory)) {
-            delBtn.innerHTML = `<div class="flex justify-end mb-3"><button onclick="shipDeleteCategory('${shipCurrentCategory}')" class="bg-red-50 hover:bg-red-100 text-red-400 px-4 py-2 rounded-2xl font-bold text-xs flex items-center gap-2 transition-all click-scale border border-red-100">🗑️ 刪除「${shipCurrentCategory}」分頁</button></div>`;
+            delBtn.innerHTML = `
+                <div class="flex justify-end gap-2 mb-3">
+                    <button onclick="shipStartRename('${shipCurrentCategory}')" class="bg-blue-50 hover:bg-blue-100 text-blue-400 px-4 py-2 rounded-2xl font-bold text-xs flex items-center gap-2 transition-all click-scale border border-blue-100">✏️ 更改名稱</button>
+                    <button onclick="shipDeleteCategory('${shipCurrentCategory}')" class="bg-red-50 hover:bg-red-100 text-red-400 px-4 py-2 rounded-2xl font-bold text-xs flex items-center gap-2 transition-all click-scale border border-red-100">🗑️ 刪除此分頁</button>
+                </div>
+                <div id="ship-rename-box" class="hidden mb-4 flex gap-2 items-center bg-blue-50 border border-blue-100 rounded-2xl p-3">
+                    <input id="ship-rename-input" type="text" placeholder="輸入新名稱..." class="flex-1 px-4 py-2 rounded-xl border border-blue-200 text-sm text-slate-600 outline-none" style="font-size:16px">
+                    <button onclick="shipConfirmRename('${shipCurrentCategory}')" class="bg-blue-400 text-white px-4 py-2 rounded-xl font-bold text-sm click-scale">確認</button>
+                    <button onclick="document.getElementById('ship-rename-box').classList.add('hidden')" class="bg-slate-100 text-slate-400 px-3 py-2 rounded-xl font-bold text-sm">✕</button>
+                </div>
+            `;
         } else {
             delBtn.innerHTML = '';
         }
@@ -1458,6 +1468,50 @@
         delete shipDefaultImages[itemId];
         delete shipSelectedItems[itemId];
         shipSaveToStorage();
+        shipRenderGrid();
+        shipUpdateUI();
+    };
+
+    // 展開改名輸入框
+    window.shipStartRename = function(cat) {
+        const box = document.getElementById('ship-rename-box');
+        const input = document.getElementById('ship-rename-input');
+        box.classList.toggle('hidden');
+        input.value = cat;
+        input.focus();
+        input.select();
+    };
+
+    // 確認改名
+    window.shipConfirmRename = function(oldName) {
+        const newName = document.getElementById('ship-rename-input').value.trim();
+        if (!newName || newName === oldName) return;
+        if (shipCategories.includes(newName)) { alert('此名稱已存在'); return; }
+
+        // 更新分類列表
+        const idx = shipCategories.indexOf(oldName);
+        if (idx > -1) shipCategories[idx] = newName;
+        const eidx = shipExtraCategories.indexOf(oldName);
+        if (eidx > -1) shipExtraCategories[eidx] = newName;
+        localStorage.setItem('shipExtraCategories', JSON.stringify(shipExtraCategories));
+
+        // 更新圖片 key
+        Object.keys(shipDefaultImages).filter(k => k.startsWith(oldName + '-')).forEach(k => {
+            const newKey = newName + '-' + k.split('-')[1];
+            shipDefaultImages[newKey] = shipDefaultImages[k];
+            delete shipDefaultImages[k];
+            if (shipCustomImages[k]) {
+                shipCustomImages[newKey] = shipCustomImages[k];
+                delete shipCustomImages[k];
+            }
+            if (shipSelectedItems[k]) {
+                shipSelectedItems[newKey] = shipSelectedItems[k];
+                delete shipSelectedItems[k];
+            }
+        });
+        shipSaveToStorage();
+        shipCurrentCategory = newName;
+        shipRenderTabs();
         shipRenderGrid();
         shipUpdateUI();
     };
