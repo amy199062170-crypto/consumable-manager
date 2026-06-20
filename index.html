@@ -1168,6 +1168,10 @@
     }
 
     function shipInit() {
+        // 還原自訂上傳的圖片（包含新增的款式）
+        Object.keys(shipCustomImages).forEach(id => {
+            shipDefaultImages[id] = shipCustomImages[id];
+        });
         shipRenderTabs();
         shipRenderGrid();
         shipUpdateUI();
