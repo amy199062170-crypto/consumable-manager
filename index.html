@@ -1191,16 +1191,12 @@
             const catCount = Object.entries(shipSelectedItems)
                 .filter(([key, val]) => key.startsWith(cat) && val > 0)
                 .reduce((sum, [_, val]) => sum + val, 0);
-            const isCustom = shipExtraCategories.includes(cat);
             return `
-                <div class="flex items-center whitespace-nowrap">
-                    <button onclick="shipSwitchCategory('${cat}')"
-                            class="px-4 py-4 flex items-center gap-2 transition-all border-b-4 border-transparent ${shipCurrentCategory === cat ? 'ship-tab-active' : 'text-slate-300'}">
-                        ${cat}
-                        ${catCount > 0 ? `<span class="bg-purple-200 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black">${catCount}</span>` : ''}
-                    </button>
-                    ${isCustom ? `<button onclick="shipDeleteCategory('${cat}')" class="text-slate-200 hover:text-red-400 text-xs px-1 pb-1 transition-colors" title="刪除此分頁">✕</button>` : ''}
-                </div>
+                <button onclick="shipSwitchCategory('${cat}')"
+                        class="px-6 py-4 flex items-center gap-2 whitespace-nowrap transition-all border-b-4 border-transparent ${shipCurrentCategory === cat ? 'ship-tab-active' : 'text-slate-300'}">
+                    ${cat}
+                    ${catCount > 0 ? `<span class="bg-purple-200 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black">${catCount}</span>` : ''}
+                </button>
             `;
         }).join('');
     }
@@ -1213,6 +1209,18 @@
 
     function shipRenderGrid() {
         const grid = document.getElementById('ship-item-grid');
+        // 顯示/隱藏刪除分頁按鈕
+        let delBtn = document.getElementById('ship-delete-cat-btn');
+        if (!delBtn) {
+            delBtn = document.createElement('div');
+            delBtn.id = 'ship-delete-cat-btn';
+            grid.parentNode.insertBefore(delBtn, grid);
+        }
+        if (shipExtraCategories.includes(shipCurrentCategory)) {
+            delBtn.innerHTML = `<div class="flex justify-end mb-3"><button onclick="shipDeleteCategory('${shipCurrentCategory}')" class="bg-red-50 hover:bg-red-100 text-red-400 px-4 py-2 rounded-2xl font-bold text-xs flex items-center gap-2 transition-all click-scale border border-red-100">🗑️ 刪除「${shipCurrentCategory}」分頁</button></div>`;
+        } else {
+            delBtn.innerHTML = '';
+        }
         const availableItems = Object.keys(shipDefaultImages)
             .filter(key => key.startsWith(`${shipCurrentCategory}-`))
             .sort();
