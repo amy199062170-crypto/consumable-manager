@@ -1191,12 +1191,16 @@
             const catCount = Object.entries(shipSelectedItems)
                 .filter(([key, val]) => key.startsWith(cat) && val > 0)
                 .reduce((sum, [_, val]) => sum + val, 0);
+            const isCustom = shipExtraCategories.includes(cat);
             return `
-                <button onclick="shipSwitchCategory('${cat}')"
-                        class="px-6 py-4 flex items-center gap-2 whitespace-nowrap transition-all border-b-4 border-transparent ${shipCurrentCategory === cat ? 'ship-tab-active' : 'text-slate-300'}">
-                    ${cat}
-                    ${catCount > 0 ? `<span class="bg-purple-200 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black">${catCount}</span>` : ''}
-                </button>
+                <div class="flex items-center whitespace-nowrap">
+                    <button onclick="shipSwitchCategory('${cat}')"
+                            class="px-4 py-4 flex items-center gap-2 transition-all border-b-4 border-transparent ${shipCurrentCategory === cat ? 'ship-tab-active' : 'text-slate-300'}">
+                        ${cat}
+                        ${catCount > 0 ? `<span class="bg-purple-200 text-white text-[10px] px-1.5 py-0.5 rounded-full font-black">${catCount}</span>` : ''}
+                    </button>
+                    ${isCustom ? `<button onclick="shipDeleteCategory('${cat}')" class="text-slate-200 hover:text-red-400 text-xs px-1 pb-1 transition-colors" title="刪除此分頁">✕</button>` : ''}
+                </div>
             `;
         }).join('');
     }
@@ -1446,6 +1450,28 @@
         delete shipDefaultImages[itemId];
         delete shipSelectedItems[itemId];
         shipSaveToStorage();
+        shipRenderGrid();
+        shipUpdateUI();
+    };
+
+    // 刪除分類
+    window.shipDeleteCategory = function(cat) {
+        if (!confirm(`確定要刪除「${cat}」分頁及其所有圖片嗎？`)) return;
+        // 移除此分類的所有圖片
+        Object.keys(shipDefaultImages).filter(k => k.startsWith(cat + '-')).forEach(k => {
+            delete shipDefaultImages[k];
+            delete shipCustomImages[k];
+            delete shipSelectedItems[k];
+        });
+        // 移除分類
+        const idx = shipCategories.indexOf(cat);
+        if (idx > -1) shipCategories.splice(idx, 1);
+        const eidx = shipExtraCategories.indexOf(cat);
+        if (eidx > -1) shipExtraCategories.splice(eidx, 1);
+        localStorage.setItem('shipExtraCategories', JSON.stringify(shipExtraCategories));
+        shipSaveToStorage();
+        shipCurrentCategory = shipCategories[0];
+        shipRenderTabs();
         shipRenderGrid();
         shipUpdateUI();
     };
