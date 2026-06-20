@@ -1356,40 +1356,71 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    // 壓縮圖片（最大 400px，品質 0.7）
+    function shipCompressImage(file, callback) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const MAX = 400;
+                let w = img.width, h = img.height;
+                if (w > h) { if (w > MAX) { h = h * MAX / w; w = MAX; } }
+                else { if (h > MAX) { w = w * MAX / h; h = MAX; } }
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                callback(canvas.toDataURL('image/jpeg', 0.7));
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // 安全存入 localStorage（超過容量時清掉舊的）
+    function shipSaveToStorage() {
+        try {
+            localStorage.setItem('shipCustomImages', JSON.stringify(shipCustomImages));
+        } catch (e) {
+            // 容量不足：清掉舊圖片只保留目前這批
+            const keys = Object.keys(shipCustomImages);
+            if (keys.length > 5) {
+                keys.slice(0, keys.length - 5).forEach(k => delete shipCustomImages[k]);
+                try { localStorage.setItem('shipCustomImages', JSON.stringify(shipCustomImages)); } catch (e2) {}
+            }
+        }
+    }
+
     // 取得某類別下一個可用的款式字母
     function shipNextStyle(cat) {
         const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-        const usedStyles = Object.keys(shipDefaultImages)
-            .concat(Object.keys(shipCustomImages))
+        const used = Object.keys(shipDefaultImages)
             .filter(k => k.startsWith(cat + '-'))
             .map(k => k.split('-')[1]);
-        return letters.find(l => !usedStyles.includes(l)) || (Date.now().toString(36).toUpperCase());
+        return letters.find(l => !used.includes(l)) || ('Z' + Date.now());
     }
 
     // 批量上傳 → 新增到目前類別
     window.shipHandleUpload = function(event) {
         const files = Array.from(event.target.files);
+        if (!files.length) return;
         let done = 0;
         files.forEach(file => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                // 先看檔名能不能對應到現有款式（格式：系列名稱-A.jpg）
+            shipCompressImage(file, (compressed) => {
                 const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
                 if (shipDefaultImages[nameWithoutExt] !== undefined) {
-                    // 替換現有圖片
-                    shipCustomImages[nameWithoutExt] = e.target.result;
+                    shipCustomImages[nameWithoutExt] = compressed;
                 } else {
-                    // 新增到目前類別
                     const newStyle = shipNextStyle(shipCurrentCategory);
                     const newId = `${shipCurrentCategory}-${newStyle}`;
-                    shipDefaultImages[newId] = e.target.result;
-                    shipCustomImages[newId] = e.target.result;
+                    shipDefaultImages[newId] = compressed;
+                    shipCustomImages[newId] = compressed;
                 }
-                localStorage.setItem('shipCustomImages', JSON.stringify(shipCustomImages));
                 done++;
-                if (done === files.length) shipRenderGrid();
-            };
-            reader.readAsDataURL(file);
+                if (done === files.length) {
+                    shipSaveToStorage();
+                    shipRenderGrid();
+                }
+            });
         });
         event.target.value = '';
     };
@@ -1398,13 +1429,11 @@
     window.shipUploadSingle = function(itemId, input) {
         const file = input.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            shipCustomImages[itemId] = e.target.result;
-            localStorage.setItem('shipCustomImages', JSON.stringify(shipCustomImages));
+        shipCompressImage(file, (compressed) => {
+            shipCustomImages[itemId] = compressed;
+            shipSaveToStorage();
             shipRenderGrid();
-        };
-        reader.readAsDataURL(file);
+        });
         input.value = '';
     };
 </script>
