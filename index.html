@@ -1356,30 +1356,45 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    // 批量上傳（根據檔名對應款式）
+    // 取得某類別下一個可用的款式字母
+    function shipNextStyle(cat) {
+        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        const usedStyles = Object.keys(shipDefaultImages)
+            .concat(Object.keys(shipCustomImages))
+            .filter(k => k.startsWith(cat + '-'))
+            .map(k => k.split('-')[1]);
+        return letters.find(l => !usedStyles.includes(l)) || (Date.now().toString(36).toUpperCase());
+    }
+
+    // 批量上傳 → 新增到目前類別
     window.shipHandleUpload = function(event) {
-        const files = event.target.files;
-        let count = 0;
-        Array.from(files).forEach(file => {
-            const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
-            if (shipDefaultImages[nameWithoutExt] !== undefined || true) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
+        const files = Array.from(event.target.files);
+        let done = 0;
+        files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                // 先看檔名能不能對應到現有款式（格式：系列名稱-A.jpg）
+                const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+                if (shipDefaultImages[nameWithoutExt] !== undefined) {
+                    // 替換現有圖片
                     shipCustomImages[nameWithoutExt] = e.target.result;
-                    localStorage.setItem('shipCustomImages', JSON.stringify(shipCustomImages));
-                    count++;
-                    if (count === files.length) {
-                        shipRenderGrid();
-                        document.getElementById('ship-upload-hint').classList.remove('hidden');
-                    }
-                };
-                reader.readAsDataURL(file);
-            }
+                } else {
+                    // 新增到目前類別
+                    const newStyle = shipNextStyle(shipCurrentCategory);
+                    const newId = `${shipCurrentCategory}-${newStyle}`;
+                    shipDefaultImages[newId] = e.target.result;
+                    shipCustomImages[newId] = e.target.result;
+                }
+                localStorage.setItem('shipCustomImages', JSON.stringify(shipCustomImages));
+                done++;
+                if (done === files.length) shipRenderGrid();
+            };
+            reader.readAsDataURL(file);
         });
         event.target.value = '';
     };
 
-    // 單張上傳
+    // 單張上傳（替換現有圖片）
     window.shipUploadSingle = function(itemId, input) {
         const file = input.files[0];
         if (!file) return;
