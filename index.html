@@ -1169,6 +1169,7 @@
     let shipCustomImages = {};
     let shipExtraCategories = [];
     let shipCustomLabels = {};
+    let shipDeletedItems = new Set(); // 已刪除的項目（含預設圖片）
     let shipCurrentCategory = shipCategories[0];
     let shipSelectedItems = {};
 
@@ -1197,7 +1198,10 @@
             const d = metaSnap.data();
             shipExtraCategories = d.extraCategories || [];
             shipCustomLabels = d.labels || {};
+            shipDeletedItems = new Set(d.deletedItems || []);
         }
+        // 從預設圖片中移除已刪除的項目
+        shipDeletedItems.forEach(id => delete shipDefaultImages[id]);
         shipExtraCategories.forEach(c => { if (!shipCategories.includes(c)) shipCategories.push(c); });
 
         // 載入圖片
@@ -1218,7 +1222,11 @@
     async function shipSaveMeta() {
         const { setDoc } = window._shipFS;
         const refs = SHIP_COL();
-        await setDoc(refs.meta, { extraCategories: shipExtraCategories, labels: shipCustomLabels });
+        await setDoc(refs.meta, {
+            extraCategories: shipExtraCategories,
+            labels: shipCustomLabels,
+            deletedItems: [...shipDeletedItems]
+        });
     }
 
     async function shipSaveImage(itemId, dataUrl) {
@@ -1532,7 +1540,9 @@
         delete shipCustomImages[itemId];
         delete shipDefaultImages[itemId];
         delete shipSelectedItems[itemId];
+        shipDeletedItems.add(itemId);
         await shipDeleteImageFromDB(itemId);
+        await shipSaveMeta();
         shipRenderGrid();
         shipUpdateUI();
     };
@@ -1605,6 +1615,7 @@
         const keys = Object.keys(shipDefaultImages).filter(k => k.startsWith(cat + '-'));
         for (const k of keys) {
             delete shipDefaultImages[k];
+            shipDeletedItems.add(k);
             if (shipCustomImages[k]) { await shipDeleteImageFromDB(k); delete shipCustomImages[k]; }
             delete shipSelectedItems[k];
         }
