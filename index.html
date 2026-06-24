@@ -1601,6 +1601,11 @@
                 delete shipCustomImages[k];
             }
             if (shipSelectedItems[k]) { shipSelectedItems[newKey] = shipSelectedItems[k]; delete shipSelectedItems[k]; }
+            // 保留自訂標籤
+            if (shipCustomLabels[k]) {
+                shipCustomLabels[newKey] = shipCustomLabels[k];
+                delete shipCustomLabels[k];
+            }
         }
         await shipSaveMeta();
         shipCurrentCategory = newName;
