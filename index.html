@@ -1263,8 +1263,8 @@
                         <button onclick="shipStartRenameItem('${itemId}')" class="text-slate-300 hover:text-blue-400 text-xs transition-colors">✏️</button>
                     </div>
                     <div id="rename-box-${itemId}" class="hidden mb-2 flex gap-1">
-                        <input id="rename-input-${itemId}" type="text" value="${label}" class="flex-1 px-2 py-1 rounded-lg border border-blue-200 text-xs text-slate-600 outline-none" style="font-size:14px">
-                        <button onclick="shipConfirmRenameItem('${itemId}')" class="bg-blue-400 text-white px-2 py-1 rounded-lg text-xs font-bold">✓</button>
+                        <input id="rename-input-${itemId}" type="text" value="${label}" class="flex-1 min-w-0 px-2 py-1 rounded-lg border border-blue-200 text-xs text-slate-600 outline-none" style="font-size:14px">
+                        <button onclick="shipConfirmRenameItem('${itemId}')" class="bg-blue-400 text-white w-7 h-7 flex-shrink-0 rounded-lg text-xs font-bold flex items-center justify-center">✓</button>
                     </div>
                     <div class="flex items-center justify-between bg-slate-50 rounded-xl p-1">
                         <button onclick="shipRemoveItem('${itemId}')" class="w-8 h-8 flex items-center justify-center rounded-lg bg-white text-slate-300 hover:text-red-400 shadow-sm click-scale">
