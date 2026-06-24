@@ -586,6 +586,8 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
     const auth = getAuth(app);
+    window._shipDB = db;
+    window._shipFS = { doc, getDoc, setDoc, deleteDoc, collection, getDocs, onSnapshot };
 
     let currentType = 'in';
     let currentCategory = 'uv';
@@ -1090,6 +1092,7 @@
 </script>
 <script>
     // ── 出貨核對邏輯 ──
+    const SHIP_APP_ID = 'consumable-master-pro';
     const shipCategories = ["花朵系列", "貓咪系列", "狗狗系列", "裝飾線條", "正負能量"];
 
     const shipDefaultImages = {
@@ -1163,26 +1166,71 @@
         "正負能量-V":"https://down-tw.img.susercontent.com/tw-11134207-81ztq-mjnupw0ddhqb25",
     };
 
-    // 從 localStorage 讀取自訂圖片
-    let shipCustomImages = JSON.parse(localStorage.getItem('shipCustomImages') || '{}');
-    let shipExtraCategories = JSON.parse(localStorage.getItem('shipExtraCategories') || '[]');
-    // 合併自訂分類
-    shipExtraCategories.forEach(c => { if (!shipCategories.includes(c)) shipCategories.push(c); });
+    let shipCustomImages = {};
+    let shipExtraCategories = [];
+    let shipCustomLabels = {};
     let shipCurrentCategory = shipCategories[0];
     let shipSelectedItems = {};
+
+    const SHIP_COL = () => {
+        const db = window._shipDB;
+        const { collection, doc } = window._shipFS;
+        return {
+            images: (id) => doc(db, 'artifacts', SHIP_APP_ID, 'public', 'data', 'shipImages', id.replace(/\//g,'-')),
+            imagesCol: collection(db, 'artifacts', SHIP_APP_ID, 'public', 'data', 'shipImages'),
+            meta: doc(db, 'artifacts', SHIP_APP_ID, 'public', 'data', 'shipMeta', 'main'),
+        };
+    };
 
     function shipGetImage(id) {
         return shipCustomImages[id] || shipDefaultImages[id] || '';
     }
 
-    function shipInit() {
-        // 還原自訂上傳的圖片（包含新增的款式）
-        Object.keys(shipCustomImages).forEach(id => {
-            shipDefaultImages[id] = shipCustomImages[id];
+    async function shipInit() {
+        if (!window._shipDB) { setTimeout(shipInit, 500); return; }
+        const { getDoc, getDocs, onSnapshot } = window._shipFS;
+        const refs = SHIP_COL();
+
+        // 載入 meta（分類 + 標籤）
+        const metaSnap = await getDoc(refs.meta);
+        if (metaSnap.exists()) {
+            const d = metaSnap.data();
+            shipExtraCategories = d.extraCategories || [];
+            shipCustomLabels = d.labels || {};
+        }
+        shipExtraCategories.forEach(c => { if (!shipCategories.includes(c)) shipCategories.push(c); });
+
+        // 載入圖片
+        const imgSnap = await getDocs(refs.imagesCol);
+        imgSnap.forEach(d => {
+            const { itemId, data } = d.data();
+            if (itemId && data) {
+                shipCustomImages[itemId] = data;
+                shipDefaultImages[itemId] = data;
+            }
         });
+
         shipRenderTabs();
         shipRenderGrid();
         shipUpdateUI();
+    }
+
+    async function shipSaveMeta() {
+        const { setDoc } = window._shipFS;
+        const refs = SHIP_COL();
+        await setDoc(refs.meta, { extraCategories: shipExtraCategories, labels: shipCustomLabels });
+    }
+
+    async function shipSaveImage(itemId, dataUrl) {
+        const { setDoc } = window._shipFS;
+        const refs = SHIP_COL();
+        await setDoc(refs.images(itemId), { itemId, data: dataUrl });
+    }
+
+    async function shipDeleteImageFromDB(itemId) {
+        const { deleteDoc } = window._shipFS;
+        const refs = SHIP_COL();
+        await deleteDoc(refs.images(itemId));
     }
 
     function shipRenderTabs() {
@@ -1398,6 +1446,9 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    // 移除舊的 localStorage 函數（已被 Firebase 取代）
+    function shipSaveToStorage() {} // 保留空函數避免錯誤
+
     // 壓縮圖片（最大 400px，品質 0.7）
     function shipCompressImage(file, callback) {
         const reader = new FileReader();
@@ -1447,40 +1498,46 @@
         if (!files.length) return;
         let done = 0;
         files.forEach(file => {
-            shipCompressImage(file, (compressed) => {
+            shipCompressImage(file, async (compressed) => {
                 const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
-                if (shipDefaultImages[nameWithoutExt] !== undefined) {
-                    shipCustomImages[nameWithoutExt] = compressed;
-                } else {
-                    const newStyle = shipNextStyle(shipCurrentCategory);
-                    const newId = `${shipCurrentCategory}-${newStyle}`;
-                    shipDefaultImages[newId] = compressed;
-                    shipCustomImages[newId] = compressed;
-                }
+                const itemId = (shipDefaultImages[nameWithoutExt] !== undefined)
+                    ? nameWithoutExt
+                    : `${shipCurrentCategory}-${shipNextStyle(shipCurrentCategory)}`;
+                shipCustomImages[itemId] = compressed;
+                shipDefaultImages[itemId] = compressed;
+                await shipSaveImage(itemId, compressed);
                 done++;
-                if (done === files.length) {
-                    shipSaveToStorage();
-                    shipRenderGrid();
-                }
+                if (done === files.length) shipRenderGrid();
             });
         });
         event.target.value = '';
     };
 
+    // 單張上傳
+    window.shipUploadSingle = function(itemId, input) {
+        const file = input.files[0];
+        if (!file) return;
+        shipCompressImage(file, async (compressed) => {
+            shipCustomImages[itemId] = compressed;
+            shipDefaultImages[itemId] = compressed;
+            await shipSaveImage(itemId, compressed);
+            shipRenderGrid();
+        });
+        input.value = '';
+    };
+
     // 刪除圖片項目
-    window.shipDeleteItem = function(itemId) {
+    window.shipDeleteItem = async function(itemId) {
         if (!confirm(`確定要刪除「${itemId}」嗎？`)) return;
         delete shipCustomImages[itemId];
         delete shipDefaultImages[itemId];
         delete shipSelectedItems[itemId];
-        shipSaveToStorage();
+        await shipDeleteImageFromDB(itemId);
         shipRenderGrid();
         shipUpdateUI();
     };
 
     // 款式改名
-    let shipCustomLabels = JSON.parse(localStorage.getItem('shipCustomLabels') || '{}');
-
     window.shipStartRenameItem = function(itemId) {
         const box = document.getElementById(`rename-box-${itemId}`);
         const input = document.getElementById(`rename-input-${itemId}`);
@@ -1489,18 +1546,18 @@
         input.select();
     };
 
-    window.shipConfirmRenameItem = function(itemId) {
+    window.shipConfirmRenameItem = async function(itemId) {
         const input = document.getElementById(`rename-input-${itemId}`);
         const newLabel = input.value.trim();
         if (!newLabel) return;
         shipCustomLabels[itemId] = newLabel;
-        localStorage.setItem('shipCustomLabels', JSON.stringify(shipCustomLabels));
+        await shipSaveMeta();
         const label = document.getElementById(`label-${itemId}`);
         if (label) label.innerText = newLabel;
         document.getElementById(`rename-box-${itemId}`).classList.add('hidden');
     };
 
-    // 展開改名輸入框
+    // 分類改名（展開）
     window.shipStartRename = function(cat) {
         const box = document.getElementById('ship-rename-box');
         const input = document.getElementById('ship-rename-input');
@@ -1510,34 +1567,32 @@
         input.select();
     };
 
-    // 確認改名
-    window.shipConfirmRename = function(oldName) {
+    // 分類改名（確認）
+    window.shipConfirmRename = async function(oldName) {
         const newName = document.getElementById('ship-rename-input').value.trim();
         if (!newName || newName === oldName) return;
         if (shipCategories.includes(newName)) { alert('此名稱已存在'); return; }
 
-        // 更新分類列表
         const idx = shipCategories.indexOf(oldName);
         if (idx > -1) shipCategories[idx] = newName;
         const eidx = shipExtraCategories.indexOf(oldName);
         if (eidx > -1) shipExtraCategories[eidx] = newName;
-        localStorage.setItem('shipExtraCategories', JSON.stringify(shipExtraCategories));
 
         // 更新圖片 key
-        Object.keys(shipDefaultImages).filter(k => k.startsWith(oldName + '-')).forEach(k => {
+        const keysToRename = Object.keys(shipDefaultImages).filter(k => k.startsWith(oldName + '-'));
+        for (const k of keysToRename) {
             const newKey = newName + '-' + k.split('-')[1];
             shipDefaultImages[newKey] = shipDefaultImages[k];
             delete shipDefaultImages[k];
             if (shipCustomImages[k]) {
                 shipCustomImages[newKey] = shipCustomImages[k];
+                await shipSaveImage(newKey, shipCustomImages[newKey]);
+                await shipDeleteImageFromDB(k);
                 delete shipCustomImages[k];
             }
-            if (shipSelectedItems[k]) {
-                shipSelectedItems[newKey] = shipSelectedItems[k];
-                delete shipSelectedItems[k];
-            }
-        });
-        shipSaveToStorage();
+            if (shipSelectedItems[k]) { shipSelectedItems[newKey] = shipSelectedItems[k]; delete shipSelectedItems[k]; }
+        }
+        await shipSaveMeta();
         shipCurrentCategory = newName;
         shipRenderTabs();
         shipRenderGrid();
@@ -1545,21 +1600,19 @@
     };
 
     // 刪除分類
-    window.shipDeleteCategory = function(cat) {
+    window.shipDeleteCategory = async function(cat) {
         if (!confirm(`確定要刪除「${cat}」分頁及其所有圖片嗎？`)) return;
-        // 移除此分類的所有圖片
-        Object.keys(shipDefaultImages).filter(k => k.startsWith(cat + '-')).forEach(k => {
+        const keys = Object.keys(shipDefaultImages).filter(k => k.startsWith(cat + '-'));
+        for (const k of keys) {
             delete shipDefaultImages[k];
-            delete shipCustomImages[k];
+            if (shipCustomImages[k]) { await shipDeleteImageFromDB(k); delete shipCustomImages[k]; }
             delete shipSelectedItems[k];
-        });
-        // 移除分類
+        }
         const idx = shipCategories.indexOf(cat);
         if (idx > -1) shipCategories.splice(idx, 1);
         const eidx = shipExtraCategories.indexOf(cat);
         if (eidx > -1) shipExtraCategories.splice(eidx, 1);
-        localStorage.setItem('shipExtraCategories', JSON.stringify(shipExtraCategories));
-        shipSaveToStorage();
+        await shipSaveMeta();
         shipCurrentCategory = shipCategories[0];
         shipRenderTabs();
         shipRenderGrid();
@@ -1567,14 +1620,14 @@
     };
 
     // 新增分類
-    window.shipConfirmAddCategory = function() {
+    window.shipConfirmAddCategory = async function() {
         const input = document.getElementById('ship-new-cat-input');
         const name = input.value.trim();
         if (!name) return;
         if (!shipCategories.includes(name)) {
             shipCategories.push(name);
             shipExtraCategories.push(name);
-            localStorage.setItem('shipExtraCategories', JSON.stringify(shipExtraCategories));
+            await shipSaveMeta();
         }
         shipCurrentCategory = name;
         input.value = '';
